@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajouter un Produit</title>
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #005a8b, #0073ae);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #fff;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        form {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+            text-align: left;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        button {
+            background: #0073ae;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #005a8b;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: none;
+            z-index: 1000;
+        }
+
+        .popup h2 {
+            margin: 0 0 15px;
+            font-size: 1.5rem;
+        }
+
+        .popup button {
+            background: #0073ae;
+            color: #fff;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+        }
+
+        .popup button:hover {
+            background: #005a8b;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            z-index: 500;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ajouter un Produit</h1>
+    <form id="productForm" action="process.php" method="POST">
+        <label for="nom_produit">Nom du Produit :</label>
+        <input type="text" name="nom_produit" id="nom_produit" placeholder="Nom du produit" required>
+    
+        <label for="famille">Famille du Produit :</label>
+        <input type="text" name="famille" id="famille" placeholder="Famille du produit" required>
+    
+        <button type="submit">Ajouter le Produit</button>
+    </form>
+    
+
+    <div id="overlay"></div>
+    <div class="popup" id="popup">
+        <h2 id="popupMessage"></h2>
+        <button id="closePopup">OK</button>
+    </div>
+
+    <script>
+        const form = document.getElementById('productForm');
+        const submitButton = document.getElementById('submitButton');
+        const popup = document.getElementById('popup');
+        const popupMessage = document.getElementById('popupMessage');
+        const closePopup = document.getElementById('closePopup');
+        const overlay = document.getElementById('overlay');
+
+        function showPopup(message, isSuccess = true) {
+            popupMessage.textContent = message;
+            popupMessage.style.color = isSuccess ? '#0073ae' : '#dc3545';
+            popup.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+
+        function hidePopup() {
+            popup.style.display = 'none';
+            overlay.style.display = 'none';
+        }
+
+        submitButton.addEventListener('click', () => {
+            const productName = document.getElementById('nom_produit').value;
+            const productFamily = document.getElementById('famille').value;
+
+            if (productName.trim() && productFamily.trim()) {
+                showPopup('Produit ajouté avec succès !');
+                form.reset();
+            } else {
+                showPopup('Veuillez remplir tous les champs.', false);
+            }
+        });
+
+        closePopup.addEventListener('click', hidePopup);
+    </script>
+</body>
+</html>
