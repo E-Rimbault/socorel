@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajouter un Produit</title>
+    <title>Gestion des Produits</title>
     <style>
         body {
             font-family: 'Roboto', Arial, sans-serif;
@@ -39,7 +40,8 @@
             text-align: left;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        select {
             width: 100%;
             padding: 10px;
             margin-bottom: 20px;
@@ -63,104 +65,144 @@
             background: #005a8b;
         }
 
-        .popup {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            display: none;
-            z-index: 1000;
-        }
-
-        .popup h2 {
-            margin: 0 0 15px;
-            font-size: 1.5rem;
-        }
-
-        .popup button {
-            background: #0073ae;
-            color: #fff;
-            border: none;
-            padding: 8px 15px;
+        .product-list {
+            margin: 20px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
             border-radius: 5px;
+            background: #fff;
+            color: #333;
+            padding: 10px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-bottom: 1px solid #ccc;
             cursor: pointer;
-            font-size: 1rem;
-            transition: background 0.3s ease;
+            display: flex;
+            justify-content: space-between;
         }
 
-        .popup button:hover {
-            background: #005a8b;
-        }
-
-        #overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            display: none;
-            z-index: 500;
+        .product-item:hover {
+            background: #f1f1f1;
         }
     </style>
 </head>
+
 <body>
-    <h1>Ajouter un Produit</h1>
-    <form id="productForm" action="process.php" method="POST">
-        <label for="nom_produit">Nom du Produit :</label>
-        <input type="text" name="nom_produit" id="nom_produit" placeholder="Nom du produit" required>
-    
+    <form id="productForm">
+        <h1>Gestion des Produits</h1>
+
+        <label for="familySelect">Filtrer par Famille :</label>
+        <select id="familySelect">
+            <option value="">-- Sélectionnez une Famille --</option>
+        </select>
+
+        <label for="existingProducts">Produits existants :</label>
+        <div class="product-list" id="productList"></div>
+
         <label for="famille">Famille du Produit :</label>
         <input type="text" name="famille" id="famille" placeholder="Famille du produit" required>
-    
+
+        <label for="nom_produit">Nom du Produit :</label>
+        <input type="text" name="nom_produit" id="nom_produit" placeholder="Nom du produit" required>
+
+        <!-- Ajoutez ce champ sous le champ 'Nom du Produit' -->
+        <label for="quantity">Quantité à Ajouter :</label>
+        <input type="number" name="quantity" id="quantity" placeholder="Nombre de produits" min="1" required>
+
+
         <button type="submit">Ajouter le Produit</button>
     </form>
-    
-
-    <div id="overlay"></div>
-    <div class="popup" id="popup">
-        <h2 id="popupMessage"></h2>
-        <button id="closePopup">OK</button>
-    </div>
 
     <script>
-        const form = document.getElementById('productForm');
-        const submitButton = document.getElementById('submitButton');
-        const popup = document.getElementById('popup');
-        const popupMessage = document.getElementById('popupMessage');
-        const closePopup = document.getElementById('closePopup');
-        const overlay = document.getElementById('overlay');
+        const productList = document.getElementById('productList');
+        const familySelect = document.getElementById('familySelect');
+        const nomProduitInput = document.getElementById('nom_produit');
+        const familleInput = document.getElementById('famille');
 
-        function showPopup(message, isSuccess = true) {
-            popupMessage.textContent = message;
-            popupMessage.style.color = isSuccess ? '#0073ae' : '#dc3545';
-            popup.style.display = 'block';
-            overlay.style.display = 'block';
+        const products = [
+            { id: 1, name: "FP8-RS/24V", family: "FP8" },
+            { id: 2, name: "FP8-RS/230V", family: "FP8" },
+            { id: 3, name: "FP8-IP/24V", family: "FP8" },
+            { id: 4, name: "FP8-IP/230V", family: "FP8" },
+            { id: 5, name: "Téléinfo-RS/24V", family: "Téléinfo" },
+            { id: 6, name: "Téléinfo-RS/230V", family: "Téléinfo" },
+            { id: 7, name: "Téléinfo-IP/24V", family: "Téléinfo" },
+            { id: 8, name: "Téléinfo-IP/230V", family: "Téléinfo" },
+            { id: 9, name: "Sonde T+H", family: "sonde" },
+            { id: 10, name: "Sonde T,H,CO²", family: "sonde" },
+            { id: 11, name: "Tic Light", family: "Tic Light" },
+            { id: 12, name: "Flexy", family: "Flexy" },
+            { id: 13, name: "RTIC", family: "Rtic" },
+        ];
+
+        const uniqueFamilies = [...new Set(products.map(product => product.family))];
+
+        function displayFamilies() {
+            uniqueFamilies.forEach(family => {
+                const option = document.createElement('option');
+                option.value = family;
+                option.textContent = family;
+                familySelect.appendChild(option);
+            });
         }
 
-        function hidePopup() {
-            popup.style.display = 'none';
-            overlay.style.display = 'none';
-        }
+        function displayProducts(filterFamily = "") {
+            productList.innerHTML = "";
+            const filteredProducts = products.filter(product => product.family === filterFamily);
 
-        submitButton.addEventListener('click', () => {
-            const productName = document.getElementById('nom_produit').value;
-            const productFamily = document.getElementById('famille').value;
-
-            if (productName.trim() && productFamily.trim()) {
-                showPopup('Produit ajouté avec succès !');
-                form.reset();
+            if (filteredProducts.length === 0) {
+                productList.innerHTML = "<p>Aucun produit disponible</p>";
             } else {
-                showPopup('Veuillez remplir tous les champs.', false);
+                filteredProducts.forEach(product => {
+                    const productItem = document.createElement('div');
+                    productItem.classList.add('product-item');
+                    productItem.textContent = `${product.name} - ${product.family}`;
+                    productItem.dataset.name = product.name;
+                    productItem.dataset.family = product.family;
+                    productItem.addEventListener('click', () => selectProduct(product));
+                    productList.appendChild(productItem);
+                });
             }
+        }
+
+        function selectProduct(product) {
+            nomProduitInput.value = product.name;
+            familleInput.value = product.family;
+        }
+
+        familySelect.addEventListener('change', () => {
+            const selectedFamily = familySelect.value;
+            displayProducts(selectedFamily);
         });
 
-        closePopup.addEventListener('click', hidePopup);
+        displayFamilies();
+
+        document.getElementById('productForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            fetch('process.php', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error); // Affiche une pop-up en cas d'erreur
+                    } else if (data.success) {
+                        alert(data.success); // Affiche une pop-up en cas de succès
+                    }
+                })
+                .catch(error => {
+                    alert("Une erreur est survenue : " + error.message);
+                });
+        });
     </script>
 </body>
+
 </html>

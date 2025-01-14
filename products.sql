@@ -1,71 +1,69 @@
--- phpMyAdmin SQL Dump
--- version 5.2.0
--- https://www.phpmyadmin.net/
---
--- Hôte : 127.0.0.1:3306
--- Généré le : mar. 07 jan. 2025 à 10:57
--- Version du serveur : 8.0.31
--- Version de PHP : 8.1.0
+-- Supprimer la table si elle existe
+DROP TABLE IF EXISTS products;
 
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+00:00";
-
--- Configuration de la base
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
--- Base de données : `socorel-gestion`
-
--- --------------------------------------------------------
-
--- Structure de la table `products`
-DROP TABLE IF EXISTS `products`;
-CREATE TABLE IF NOT EXISTS `products` (
-  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `barcode` int UNSIGNED NOT NULL,
-  `nom_produit` varchar(255) NOT NULL,
-  `code_type` int NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `famille` varchar(100) NOT NULL,
-  `commercialise` tinyint(1) DEFAULT '1',
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- Déchargement des données de la table `products`
-INSERT INTO `products` (`id`, `barcode`, `nom_produit`, `code_type`, `created_at`, `famille`, `commercialise`) VALUES
--- (Ajoutez vos données ici)
+-- Recréer la table avec les modifications demandées
+CREATE TABLE IF NOT EXISTS products (
+  id bigint UNSIGNED NOT NULL AUTO_INCREMENT,
+  barcode VARCHAR(20) NOT NULL, -- Modifié pour accepter un format spécifique
+  nom_produit varchar(255) NOT NULL,
+  code_type int NOT NULL,
+  created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  famille varchar(100) NOT NULL,
+  commercialise tinyint(1) DEFAULT '1',
+  en_stock varchar(10) DEFAULT 'stocker',
+  date_envoi DATETIME NULL DEFAULT NULL, -- Colonne utilisée pour enregistrer la date d'envoi
+  PRIMARY KEY (id),
+  UNIQUE KEY unique_barcode (barcode) -- Ajout d'un index unique sur barcode
+) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Gestion des déclencheurs
 DELIMITER $$
 
-DROP TRIGGER IF EXISTS `before_insert_products`$$
-CREATE TRIGGER `before_insert_products`
-BEFORE INSERT ON `products`
+-- Supprimer le déclencheur s'il existe déjà
+DROP TRIGGER IF EXISTS before_insert_products$$
+
+-- Recréer le déclencheur pour gérer l'insertion
+CREATE TRIGGER before_insert_products
+BEFORE INSERT ON products
 FOR EACH ROW
 BEGIN
   DECLARE next_barcode INT;
+  DECLARE last_two_digits INT;
 
-  -- Si le code_type est NULL ou inférieur à 1015, initialiser à 1015
+  -- Vérifier que le code_type est supérieur ou égal à 1015, sinon l'initialiser
   IF NEW.code_type < 1015 THEN
     SET NEW.code_type = 1015;
   END IF;
 
-  -- Récupérer le dernier barcode pour le code_type donné
-  SELECT MAX(barcode) + 1 INTO next_barcode
+  -- Extraire les deux derniers chiffres du code_type
+  SET last_two_digits = NEW.code_type % 100;
+
+  -- Compter le nombre de produits existants avec ce code_type
+  SELECT COUNT(*) + 1000
+  INTO next_barcode
   FROM products
   WHERE code_type = NEW.code_type;
 
-  -- Si aucun barcode trouvé pour ce code_type, initialiser à 1
-  IF next_barcode IS NULL THEN
-    SET next_barcode = 1;
-  END IF;
+  -- Générer le barcode avec le format : les deux derniers chiffres du code_type + tiret + 4 zéros + numéro
+  SET NEW.barcode = CONCAT(LPAD(last_two_digits, 2, '0'), '-', '0000', next_barcode);
 
-  -- Affecter le barcode au nouvel enregistrement
-  SET NEW.barcode = next_barcode;
+  -- Toujours initialiser en_stock à "stocker" lors de l'insertion
+  SET NEW.en_stock = 'stocker';
+END$$
+
+-- Supprimer le déclencheur de mise à jour s'il existe déjà
+DROP TRIGGER IF EXISTS before_update_products$$
+
+-- Créer un déclencheur pour gérer les mises à jour
+CREATE TRIGGER before_update_products
+BEFORE UPDATE ON products
+FOR EACH ROW
+BEGIN
+  -- Vérifier si la colonne en_stock a été modifiée
+  IF NEW.en_stock != OLD.en_stock THEN
+    -- Mettre à jour la colonne date_envoi avec l'heure actuelle
+    SET NEW.date_envoi = NOW();
+  END IF;
 END$$
 
 DELIMITER ;
-

@@ -1,63 +1,75 @@
 <?php
-require 'database.php';
+require_once 'database.php'; // Inclure le fichier pour la connexion à la base de données
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nom_produit = trim($_POST['nom_produit']);
-    $famille = trim($_POST['famille']);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $famille = $_POST['famille'];
+    $nom_produit = $_POST['nom_produit'];
+    $quantity = intval($_POST['quantity']);
 
-    // Validation côté serveur
-    if (empty($nom_produit)) {
-        die("Erreur : Le nom du produit est requis.");
-    }
-
-    if (empty($famille)) {
-        die("Erreur : La famille du produit est requise.");
+    // Vérification des champs obligatoires
+    if (empty($famille) || empty($nom_produit) || $quantity <= 0) {
+        echo json_encode(["error" => "Tous les champs sont requis et la quantité doit être valide."]);
+        exit;
     }
 
     try {
-        // Vérifier si la gamme est encore commercialisée
-        $sql = "SELECT commercialise FROM products WHERE famille = :famille LIMIT 1";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':famille' => $famille]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($result) {
-            if ($result['commercialise'] == 0) {
-                die("Erreur : Impossible d'ajouter un produit. La gamme '$famille' n'est plus commercialisée.");
-            }
-        }
-
-        // Vérifier si le nom_produit existe déjà dans la base
-        $sql = "SELECT code_type FROM products WHERE nom_produit = :nom_produit LIMIT 1";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':nom_produit' => $nom_produit]);
-        $existingProduct = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existingProduct) {
-            // Utiliser le code_type existant
-            $code_type = $existingProduct['code_type'];
-        } else {
-            // Générer un nouveau code_type
-            $sql = "SELECT MAX(code_type) + 1 AS new_code_type FROM products";
-            $stmt = $pdo->query($sql);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            $code_type = $result['new_code_type'] ?? 1; // Si aucun produit n'existe encore, on commence à 1
-        }
-
-        // Insérer le produit dans la base
-        $sql = "INSERT INTO products (nom_produit, famille, code_type, commercialise) VALUES (:nom_produit, :famille, :code_type, 1)";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':nom_produit' => $nom_produit,
+        // Vérifier si le produit existe déjà
+        $checkStmt = $pdo->prepare("SELECT id, code_type, commercialise, MAX(barcode) AS last_barcode 
+                                    FROM products 
+                                    WHERE famille = :famille AND nom_produit = :nom_produit");
+        $checkStmt->execute([
             ':famille' => $famille,
-            ':code_type' => $code_type,
+            ':nom_produit' => $nom_produit
         ]);
+        $existingProduct = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-        echo "Produit ajouté avec succès. Code Type : $code_type";
+        if ($existingProduct && $existingProduct['code_type']) {
+            // Le produit existe déjà : vérifier si le code_type est commercialisé
+            if ($existingProduct['commercialise'] == 0) {
+                // Si commercialise est 0, empêcher l'ajout
+                echo json_encode(["error" => "Impossible d'enregistrer ce produit. La gamme (code_type) n'est plus commercialisée."]);
+                exit;
+            }
+
+            // Le produit est commercialisé : incrémenter le barcode
+            $currentCodeType = $existingProduct['code_type'];
+            $lastBarcode = $existingProduct['last_barcode'] ?? 0;
+
+            // Préparer la requête pour insérer un produit avec le même code_type
+            $stmt = $pdo->prepare("INSERT INTO products (famille, nom_produit, code_type, barcode) VALUES (:famille, :nom_produit, :code_type, :barcode)");
+
+            for ($i = 0; $i < $quantity; $i++) {
+                $stmt->execute([
+                    ':famille' => $famille,
+                    ':nom_produit' => $nom_produit,
+                    ':code_type' => $currentCodeType,
+                    ':barcode' => ++$lastBarcode
+                ]);
+            }
+
+            echo json_encode(["success" => "$quantity enregistrements ajoutés pour le produit existant avec code_type $currentCodeType."]);
+        } else {
+            // Le produit n'existe pas : créer un nouveau code_type et commencer le barcode à 1
+            $codeStmt = $pdo->query("SELECT MAX(code_type) AS last_code_type FROM products");
+            $lastCodeType = $codeStmt->fetch(PDO::FETCH_ASSOC)['last_code_type'];
+            $newCodeType = $lastCodeType ? $lastCodeType + 1 : 1015;
+            $newBarcode = 1;
+
+            // Préparer la requête pour insérer un nouveau produit
+            $stmt = $pdo->prepare("INSERT INTO products (famille, nom_produit, code_type, barcode) VALUES (:famille, :nom_produit, :code_type, :barcode)");
+
+            for ($i = 0; $i < $quantity; $i++) {
+                $stmt->execute([
+                    ':famille' => $famille,
+                    ':nom_produit' => $nom_produit,
+                    ':code_type' => $newCodeType,
+                    ':barcode' => $newBarcode++
+                ]);
+            }
+
+            echo json_encode(["success" => "Nouveau produit ajouté $quantity fois avec code_type $newCodeType."]);
+        }
     } catch (PDOException $e) {
-        echo "Erreur lors de l'ajout du produit : " . $e->getMessage();
+        echo json_encode(["error" => "Erreur lors de l'insertion : " . $e->getMessage()]);
     }
-} else {
-    echo "Méthode de requête non autorisée.";
 }
-?>
